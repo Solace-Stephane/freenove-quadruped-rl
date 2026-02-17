@@ -1,0 +1,312 @@
+<mujoco model="freenove_dog">
+  <!--
+    Freenove Robot Dog Kit (FNK0050) MuJoCo Model
+    ================================================
+    Physical dimensions (from source code):
+      Body:    136mm (length) x 76mm (width) x ~30mm (height)
+      Hip:     23mm  (l1, coxa)
+      Femur:   55mm  (l2, upper leg)
+      Tibia:   55mm  (l3, lower leg)
+      Standing height: 99mm from hip to ground
+      Foot lateral offset: +/-10mm from hip plane
+
+    Joint naming convention (mjlab compatible):
+      {LF,RF,LH,RH}_{HAA,HFE,KFE}
+      HAA = Hip Abduction/Adduction (lateral swing)
+      HFE = Hip Flexion/Extension (fore-aft swing)
+      KFE = Knee Flexion/Extension
+
+    Coordinate system:
+      X = forward, Y = left, Z = up (MuJoCo default)
+
+    All units in SI: meters, kg, radians
+  -->
+
+  <compiler angle="radian" meshdir="assets" autolimits="true"/>
+
+  <option timestep="0.005" iterations="10" ls_iterations="20" gravity="0 0 -9.81">
+    <flag warmstart="enable"/>
+  </option>
+
+  <default>
+    <default class="visual">
+      <geom contype="0" conaffinity="0" group="2" rgba="0.3 0.3 0.3 1"/>
+    </default>
+    <default class="collision">
+      <geom contype="1" conaffinity="1" group="3" rgba="0.5 0.5 0.5 0.5"/>
+    </default>
+    <default class="foot">
+      <geom contype="1" conaffinity="1" group="3" type="sphere" size="0.008"
+            rgba="0.2 0.2 0.2 1" condim="3" priority="1"
+            friction="0.8 0.02 0.01"
+            solimp="0.015 1 0.03" solref="0.015 1"/>
+    </default>
+    <default class="hip_joint">
+      <joint type="hinge" damping="0.05" armature="0.005"
+             limited="true" range="-0.6 0.6"/>
+    </default>
+    <default class="shoulder_joint">
+      <joint type="hinge" damping="0.05" armature="0.005"
+             limited="true" range="-1.4 1.4"/>
+    </default>
+    <default class="knee_joint">
+      <joint type="hinge" damping="0.05" armature="0.005"
+             limited="true" range="-1.6 1.6"/>
+    </default>
+  </default>
+
+  <asset>
+    <texture name="grid" type="2d" builtin="checker" rgb1="0.8 0.8 0.8"
+             rgb2="0.6 0.6 0.6" width="256" height="256"/>
+    <material name="grid_mat" texture="grid" texrepeat="8 8" reflectance="0.1"/>
+    <material name="body_mat" rgba="0.15 0.15 0.15 1" shininess="0.5"/>
+    <material name="leg_mat" rgba="0.25 0.25 0.3 1" shininess="0.3"/>
+    <material name="foot_mat" rgba="0.1 0.1 0.1 1"/>
+  </asset>
+
+  <worldbody>
+    <!-- Spotlight tracking the robot -->
+    <light name="spotlight" pos="0 0 3" dir="0 0 -1" diffuse="0.8 0.8 0.8"
+           specular="0.3 0.3 0.3" cutoff="60" mode="trackcom"/>
+    <light name="ambient" pos="0 0 4" directional="true"
+           diffuse="0.4 0.4 0.4" ambient="0.2 0.2 0.2"/>
+
+    <!-- ========================== BASE BODY ========================== -->
+    <body name="base" pos="0 0 0.12">
+      <freejoint name="floating_base_joint"/>
+
+      <!-- IMU sensor site at center of base -->
+      <site name="imu" pos="0 0 0" group="5"/>
+
+      <!-- Base visual: 136mm x 76mm x 30mm box -->
+      <geom class="visual" type="box" size="0.068 0.038 0.015"
+            pos="0 0 0" material="body_mat"/>
+
+      <!-- Base collision geoms -->
+      <geom name="base_collision" class="collision" type="box"
+            size="0.068 0.038 0.015" pos="0 0 0"/>
+
+      <!-- PCB / electronics plate (visual only) -->
+      <geom class="visual" type="box" size="0.055 0.035 0.005"
+            pos="0 0 0.02" rgba="0.0 0.5 0.0 0.5"/>
+
+      <!--
+        Base inertial properties (estimated):
+          Base frame + PCB + Pi + battery: ~350g total
+          Servos: 12 x ~9g = 108g (distributed to legs)
+          Base mass: ~250g (subtract servo mass)
+      -->
+      <inertial mass="0.250" pos="0 0 0"
+               diaginertia="0.0003 0.0006 0.0007"/>
+
+      <!-- =================== LEFT FRONT LEG (LF) =================== -->
+      <!--
+        Hip attachment point: (+68mm, +38mm, 0) in body frame
+        HAA axis: X (forward axis) - swings leg laterally
+        HFE axis: Y (lateral axis) - swings leg fore/aft
+        KFE axis: Y (lateral axis) - folds lower leg
+      -->
+      <body name="LF_HIP" pos="0.068 0.038 0">
+        <inertial mass="0.015" pos="0 0.0115 0"
+                 diaginertia="2e-6 1e-6 2e-6"/>
+        <joint name="LF_HAA" class="hip_joint" axis="1 0 0"/>
+
+        <!-- Hip link visual: 23mm capsule pointing laterally (+Y) -->
+        <geom class="visual" type="capsule" fromto="0 0 0 0 0.023 0"
+              size="0.008" material="leg_mat"/>
+        <geom name="LF_hip_collision" class="collision" type="capsule"
+              fromto="0 0 0 0 0.023 0" size="0.01"/>
+
+        <body name="LF_THIGH" pos="0 0.023 0">
+          <inertial mass="0.025" pos="0 0 -0.0275"
+                   diaginertia="8e-6 8e-6 1e-6"/>
+          <joint name="LF_HFE" class="shoulder_joint" axis="0 1 0"/>
+
+          <!-- Femur: 55mm capsule pointing downward (-Z) -->
+          <geom class="visual" type="capsule" fromto="0 0 0 0 0 -0.055"
+                size="0.007" material="leg_mat"/>
+          <geom name="LF_thigh_collision" class="collision" type="capsule"
+                fromto="0 0 0 0 0 -0.055" size="0.009"/>
+
+          <body name="LF_SHANK" pos="0 0 -0.055">
+            <inertial mass="0.020" pos="0 0 -0.0275"
+                     diaginertia="6e-6 6e-6 1e-6"/>
+            <joint name="LF_KFE" class="knee_joint" axis="0 1 0"/>
+
+            <!-- Tibia: 55mm capsule pointing downward (-Z) -->
+            <geom class="visual" type="capsule" fromto="0 0 0 0 0 -0.055"
+                  size="0.006" material="leg_mat"/>
+            <geom name="LF_shank_collision" class="collision" type="capsule"
+                  fromto="0 0 0 0 0 -0.055" size="0.008"/>
+
+            <!-- Foot contact site and sphere at bottom of tibia -->
+            <site name="LF" pos="0 0 -0.055" group="4"/>
+            <geom name="LF_foot" class="foot" pos="0 0 -0.055"
+                  material="foot_mat"/>
+          </body>
+        </body>
+      </body>
+
+      <!-- =================== RIGHT FRONT LEG (RF) =================== -->
+      <!--
+        Hip attachment point: (+68mm, -38mm, 0) in body frame
+        Mirror of LF: hip link goes in -Y direction
+      -->
+      <body name="RF_HIP" pos="0.068 -0.038 0">
+        <inertial mass="0.015" pos="0 -0.0115 0"
+                 diaginertia="2e-6 1e-6 2e-6"/>
+        <joint name="RF_HAA" class="hip_joint" axis="1 0 0"/>
+
+        <!-- Hip link: 23mm capsule pointing laterally (-Y) -->
+        <geom class="visual" type="capsule" fromto="0 0 0 0 -0.023 0"
+              size="0.008" material="leg_mat"/>
+        <geom name="RF_hip_collision" class="collision" type="capsule"
+              fromto="0 0 0 0 -0.023 0" size="0.01"/>
+
+        <body name="RF_THIGH" pos="0 -0.023 0">
+          <inertial mass="0.025" pos="0 0 -0.0275"
+                   diaginertia="8e-6 8e-6 1e-6"/>
+          <joint name="RF_HFE" class="shoulder_joint" axis="0 1 0"/>
+
+          <!-- Femur: 55mm capsule downward -->
+          <geom class="visual" type="capsule" fromto="0 0 0 0 0 -0.055"
+                size="0.007" material="leg_mat"/>
+          <geom name="RF_thigh_collision" class="collision" type="capsule"
+                fromto="0 0 0 0 0 -0.055" size="0.009"/>
+
+          <body name="RF_SHANK" pos="0 0 -0.055">
+            <inertial mass="0.020" pos="0 0 -0.0275"
+                     diaginertia="6e-6 6e-6 1e-6"/>
+            <joint name="RF_KFE" class="knee_joint" axis="0 1 0"/>
+
+            <!-- Tibia: 55mm capsule downward -->
+            <geom class="visual" type="capsule" fromto="0 0 0 0 0 -0.055"
+                  size="0.006" material="leg_mat"/>
+            <geom name="RF_shank_collision" class="collision" type="capsule"
+                  fromto="0 0 0 0 0 -0.055" size="0.008"/>
+
+            <site name="RF" pos="0 0 -0.055" group="4"/>
+            <geom name="RF_foot" class="foot" pos="0 0 -0.055"
+                  material="foot_mat"/>
+          </body>
+        </body>
+      </body>
+
+      <!-- =================== LEFT HIND LEG (LH) =================== -->
+      <!--
+        Hip attachment point: (-68mm, +38mm, 0) in body frame
+        Same lateral direction as LF, but rear position
+      -->
+      <body name="LH_HIP" pos="-0.068 0.038 0">
+        <inertial mass="0.015" pos="0 0.0115 0"
+                 diaginertia="2e-6 1e-6 2e-6"/>
+        <joint name="LH_HAA" class="hip_joint" axis="1 0 0"/>
+
+        <!-- Hip link: 23mm capsule pointing laterally (+Y) -->
+        <geom class="visual" type="capsule" fromto="0 0 0 0 0.023 0"
+              size="0.008" material="leg_mat"/>
+        <geom name="LH_hip_collision" class="collision" type="capsule"
+              fromto="0 0 0 0 0.023 0" size="0.01"/>
+
+        <body name="LH_THIGH" pos="0 0.023 0">
+          <inertial mass="0.025" pos="0 0 -0.0275"
+                   diaginertia="8e-6 8e-6 1e-6"/>
+          <joint name="LH_HFE" class="shoulder_joint" axis="0 1 0"/>
+
+          <!-- Femur: 55mm capsule downward -->
+          <geom class="visual" type="capsule" fromto="0 0 0 0 0 -0.055"
+                size="0.007" material="leg_mat"/>
+          <geom name="LH_thigh_collision" class="collision" type="capsule"
+                fromto="0 0 0 0 0 -0.055" size="0.009"/>
+
+          <body name="LH_SHANK" pos="0 0 -0.055">
+            <inertial mass="0.020" pos="0 0 -0.0275"
+                     diaginertia="6e-6 6e-6 1e-6"/>
+            <joint name="LH_KFE" class="knee_joint" axis="0 1 0"/>
+
+            <!-- Tibia: 55mm capsule downward -->
+            <geom class="visual" type="capsule" fromto="0 0 0 0 0 -0.055"
+                  size="0.006" material="leg_mat"/>
+            <geom name="LH_shank_collision" class="collision" type="capsule"
+                  fromto="0 0 0 0 0 -0.055" size="0.008"/>
+
+            <site name="LH" pos="0 0 -0.055" group="4"/>
+            <geom name="LH_foot" class="foot" pos="0 0 -0.055"
+                  material="foot_mat"/>
+          </body>
+        </body>
+      </body>
+
+      <!-- =================== RIGHT HIND LEG (RH) =================== -->
+      <!--
+        Hip attachment point: (-68mm, -38mm, 0) in body frame
+        Mirror of LH
+      -->
+      <body name="RH_HIP" pos="-0.068 -0.038 0">
+        <inertial mass="0.015" pos="0 -0.0115 0"
+                 diaginertia="2e-6 1e-6 2e-6"/>
+        <joint name="RH_HAA" class="hip_joint" axis="1 0 0"/>
+
+        <!-- Hip link: 23mm capsule pointing laterally (-Y) -->
+        <geom class="visual" type="capsule" fromto="0 0 0 0 -0.023 0"
+              size="0.008" material="leg_mat"/>
+        <geom name="RH_hip_collision" class="collision" type="capsule"
+              fromto="0 0 0 0 -0.023 0" size="0.01"/>
+
+        <body name="RH_THIGH" pos="0 -0.023 0">
+          <inertial mass="0.025" pos="0 0 -0.0275"
+                   diaginertia="8e-6 8e-6 1e-6"/>
+          <joint name="RH_HFE" class="shoulder_joint" axis="0 1 0"/>
+
+          <!-- Femur: 55mm capsule downward -->
+          <geom class="visual" type="capsule" fromto="0 0 0 0 0 -0.055"
+                size="0.007" material="leg_mat"/>
+          <geom name="RH_thigh_collision" class="collision" type="capsule"
+                fromto="0 0 0 0 0 -0.055" size="0.009"/>
+
+          <body name="RH_SHANK" pos="0 0 -0.055">
+            <inertial mass="0.020" pos="0 0 -0.0275"
+                     diaginertia="6e-6 6e-6 1e-6"/>
+            <joint name="RH_KFE" class="knee_joint" axis="0 1 0"/>
+
+            <!-- Tibia: 55mm capsule downward -->
+            <geom class="visual" type="capsule" fromto="0 0 0 0 0 -0.055"
+                  size="0.006" material="leg_mat"/>
+            <geom name="RH_shank_collision" class="collision" type="capsule"
+                  fromto="0 0 0 0 0 -0.055" size="0.008"/>
+
+            <site name="RH" pos="0 0 -0.055" group="4"/>
+            <geom name="RH_foot" class="foot" pos="0 0 -0.055"
+                  material="foot_mat"/>
+          </body>
+        </body>
+      </body>
+
+    </body> <!-- end base -->
+  </worldbody>
+
+  <!-- Prevent self-collision between base and thigh bodies -->
+  <contact>
+    <exclude body1="base" body2="LF_HIP"/>
+    <exclude body1="base" body2="RF_HIP"/>
+    <exclude body1="base" body2="LH_HIP"/>
+    <exclude body1="base" body2="RH_HIP"/>
+    <exclude body1="base" body2="LF_THIGH"/>
+    <exclude body1="base" body2="RF_THIGH"/>
+    <exclude body1="base" body2="LH_THIGH"/>
+    <exclude body1="base" body2="RH_THIGH"/>
+    <exclude body1="LF_HIP" body2="LF_THIGH"/>
+    <exclude body1="RF_HIP" body2="RF_THIGH"/>
+    <exclude body1="LH_HIP" body2="LH_THIGH"/>
+    <exclude body1="RH_HIP" body2="RH_THIGH"/>
+  </contact>
+
+  <!-- IMU and momentum sensors (required by mjlab velocity task) -->
+  <sensor>
+    <gyro name="imu_ang_vel" site="imu"/>
+    <velocimeter name="imu_lin_vel" site="imu"/>
+    <accelerometer name="imu_lin_acc" site="imu"/>
+    <subtreeangmom name="root_angmom" body="base"/>
+  </sensor>
+
+</mujoco>
