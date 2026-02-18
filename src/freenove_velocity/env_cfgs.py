@@ -121,19 +121,18 @@ def freenove_dog_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     ".*KFE": 0.7,
   }
 
-  # Reduce pose weight so the policy doesn't just learn to stand still.
-  cfg.rewards["pose"].weight = cfg.rewards["pose"].weight * 0.5
+  # Halve pose weight — don't let standing-still dominate.
+  cfg.rewards["pose"].weight = cfg.rewards["pose"].weight * 0.3
 
   cfg.rewards["upright"].params["asset_cfg"].body_names = ("base",)
-  cfg.rewards["upright"].weight = 1.0
+  cfg.rewards["upright"].weight = 0.5  # reduced so it doesn't dominate over walking
 
-  # Boost velocity tracking rewards — the key learning signal.
-  # Without these being dominant, the policy converges to "stand still".
+  # Boost velocity tracking rewards — the main learning signal.
   cfg.rewards["track_linear_velocity"].weight = (
-    cfg.rewards["track_linear_velocity"].weight * 2.0
+    cfg.rewards["track_linear_velocity"].weight * 3.0
   )
   cfg.rewards["track_angular_velocity"].weight = (
-    cfg.rewards["track_angular_velocity"].weight * 1.5
+    cfg.rewards["track_angular_velocity"].weight * 2.0
   )
 
   cfg.rewards["body_ang_vel"].params["asset_cfg"].body_names = ("base",)
@@ -142,22 +141,20 @@ def freenove_dog_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   for reward_name in ["foot_clearance", "foot_swing_height", "foot_slip"]:
     cfg.rewards[reward_name].params["asset_cfg"].site_names = site_names
 
-  # Reduce foot clearance penalty (small robot, low swing is fine).
+  # Foot clearance: target 15mm lift (achievable for small robot).
   cfg.rewards["foot_clearance"].weight = -0.5
-  cfg.rewards["foot_clearance"].params["target_height"] = (
-    0.02  # 20mm (vs 100mm default)
-  )
+  cfg.rewards["foot_clearance"].params["target_height"] = 0.015
   cfg.rewards["foot_swing_height"].weight = -0.05
-  cfg.rewards["foot_swing_height"].params["target_height"] = 0.02  # 20mm
+  cfg.rewards["foot_swing_height"].params["target_height"] = 0.015
 
   cfg.rewards["angular_momentum"].weight = 0.0
 
-  # Enable air time reward to encourage proper gait cycles.
-  cfg.rewards["air_time"].weight = 0.5
+  # Air time reward: the KEY signal for developing a walking gait.
+  # High weight forces the policy to lift feet off the ground.
+  cfg.rewards["air_time"].weight = 2.0
 
-  # Light action rate penalty — enough for smooth motions but not so much
-  # that it discourages the policy from moving at all.
-  cfg.rewards["action_rate_l2"].weight = -0.08
+  # Light action rate penalty — don't discourage movement.
+  cfg.rewards["action_rate_l2"].weight = -0.02
 
   # -- Terminations --
   cfg.terminations["illegal_contact"] = TerminationTermCfg(
@@ -165,37 +162,30 @@ def freenove_dog_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     params={"sensor_name": nonfoot_ground_cfg.name},
   )
 
-  # -- Commands: scale down for small robot (max ~0.3 m/s) --
+  # -- Commands: velocity range for visible walking --
+  # 0.5 m/s is ~5 body lengths/sec — achievable with hobby servos.
   cmd = cfg.commands["twist"]
   assert isinstance(cmd, UniformVelocityCommandCfg)
-  cmd.ranges.lin_vel_x = (-0.3, 0.3)
-  cmd.ranges.lin_vel_y = (-0.2, 0.2)
-  cmd.ranges.ang_vel_z = (-0.4, 0.4)
+  cmd.ranges.lin_vel_x = (-0.5, 0.5)
+  cmd.ranges.lin_vel_y = (-0.3, 0.3)
+  cmd.ranges.ang_vel_z = (-0.8, 0.8)
   cmd.viz.z_offset = 0.15
 
   # -- Curriculum: disable terrain levels (flat only) --
   cfg.curriculum.pop("terrain_levels", None)
 
-  # -- Curriculum: replace default velocity stages with robot-appropriate ones --
-  # The default curriculum starts at lin_vel_x=[-1, 1] which is 3x too fast for
-  # this small robot (max ~0.3 m/s). Use gentle ramp-up that stays within the
-  # robot's physical capability.
+  # -- Curriculum: ramp velocity up over training --
   if "command_vel" in cfg.curriculum:
     cfg.curriculum["command_vel"].params["velocity_stages"] = [
       {
         "step": 0,
-        "lin_vel_x": [-0.1, 0.1],
-        "ang_vel_z": [-0.2, 0.2],
-      },
-      {
-        "step": 60_000,
-        "lin_vel_x": [-0.2, 0.2],
-        "ang_vel_z": [-0.3, 0.3],
-      },
-      {
-        "step": 150_000,
         "lin_vel_x": [-0.3, 0.3],
         "ang_vel_z": [-0.4, 0.4],
+      },
+      {
+        "step": 100_000,
+        "lin_vel_x": [-0.5, 0.5],
+        "ang_vel_z": [-0.8, 0.8],
       },
     ]
 
