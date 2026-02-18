@@ -12,23 +12,60 @@ Includes a monkey-patch for rsl_rl's MlpModel to prevent negative noise std
 # Monkey-patch: clamp noise std so it never goes negative
 # The PyPI rsl_rl doesn't honour noise_std_type="log", so the raw std param
 # can drift negative during PPO updates.  We patch torch.distributions.Normal
-# directly so it works regardless of the rsl_rl class names.
+# to clamp scale everywhere — both at construction AND whenever .scale is
+# read or .sample()/.log_prob() are called — so no code path can see a
+# negative std.
 # ---------------------------------------------------------------------------
 import torch  # noqa: E402
 import torch.distributions as _dist  # noqa: E402
 
 _OriginalNormal = _dist.Normal
 
+_MIN_STD = 1e-6
+
 
 class _SafeNormal(_OriginalNormal):
     def __init__(self, loc, scale, validate_args=None):
-        scale = torch.clamp(scale, min=1e-6)
+        if isinstance(scale, torch.Tensor):
+            scale = scale.clamp(min=_MIN_STD)
         super().__init__(loc, scale, validate_args=validate_args)
+
+    @property
+    def scale(self):
+        # Always return clamped scale, even if someone mutated it directly
+        return self.stddev
+
+    @scale.setter
+    def scale(self, value):
+        # When rsl_rl assigns distribution.scale = ..., store clamped
+        if isinstance(value, torch.Tensor):
+            value = value.clamp(min=_MIN_STD)
+        self.__dict__["scale"] = value
+
+    @property
+    def stddev(self):
+        val = self.__dict__.get("scale", super().stddev)
+        if isinstance(val, torch.Tensor):
+            return val.clamp(min=_MIN_STD)
+        return val
+
+    def sample(self, sample_shape=torch.Size()):
+        # Belt-and-suspenders: clamp right before sampling
+        self.__dict__["scale"] = self.stddev
+        return super().sample(sample_shape)
+
+    def rsample(self, sample_shape=torch.Size()):
+        self.__dict__["scale"] = self.stddev
+        return super().rsample(sample_shape)
+
+    def log_prob(self, value):
+        self.__dict__["scale"] = self.stddev
+        return super().log_prob(value)
 
 
 _dist.Normal = _SafeNormal
 torch.distributions.Normal = _SafeNormal
-print("[freenove_velocity] ✅ Patched torch.distributions.Normal – std clamped ≥ 1e-6")
+print("[freenove_velocity] ✅ Patched torch.distributions.Normal – std clamped ≥ 1e-6 (all paths)")
 # ---------------------------------------------------------------------------
 
 from mjlab.tasks.registry import register_mjlab_task
