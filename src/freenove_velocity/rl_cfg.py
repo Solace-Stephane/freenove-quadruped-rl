@@ -18,13 +18,14 @@ def freenove_dog_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
         actor=RslRlModelCfg(
             hidden_dims=(256, 128, 64),
             stochastic=True,
-            noise_std_type="log",  # exp(param) ensures std > 0 always
         ),
         critic=RslRlModelCfg(
             hidden_dims=(256, 128, 64),
         ),
         algorithm=RslRlPpoAlgorithmCfg(
-            entropy_coef=0.02,  # more exploration for this harder problem
+            entropy_coef=0.02,
+            learning_rate=0.0003,   # 3x lower to prevent noise std going negative
+            max_grad_norm=0.5,      # tighter clipping for stability
         ),
         experiment_name="freenove_dog_velocity",
         max_iterations=8_000,
