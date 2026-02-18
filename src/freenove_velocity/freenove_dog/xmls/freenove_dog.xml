@@ -72,7 +72,7 @@
            diffuse="0.4 0.4 0.4" ambient="0.2 0.2 0.2"/>
 
     <!-- ========================== BASE BODY ========================== -->
-    <body name="base" pos="0 0 0.12">
+    <body name="base" pos="0 0 0.105">
       <freejoint name="floating_base_joint"/>
 
       <!-- IMU sensor site at center of base -->

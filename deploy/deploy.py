@@ -58,17 +58,17 @@ JOINT_NAMES = [
 DEFAULT_JOINT_POS = np.array(
   [
     0.0,
-    0.15,
-    -0.3,  # LF: HAA, HFE, KFE
+    0.3,
+    -0.5,  # LF: HAA, HFE, KFE
     0.0,
-    0.15,
-    -0.3,  # RF
+    0.3,
+    -0.5,  # RF
     0.0,
-    -0.15,
-    0.3,  # LH
+    -0.3,
+    0.5,  # LH
     0.0,
-    -0.15,
-    0.3,  # RH
+    -0.3,
+    0.5,  # RH
   ],
   dtype=np.float32,
 )
