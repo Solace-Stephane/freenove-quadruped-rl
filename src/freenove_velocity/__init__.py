@@ -11,24 +11,24 @@ Includes a monkey-patch for rsl_rl's MlpModel to prevent negative noise std
 # ---------------------------------------------------------------------------
 # Monkey-patch: clamp noise std so it never goes negative
 # The PyPI rsl_rl doesn't honour noise_std_type="log", so the raw std param
-# can drift negative during PPO updates.  We wrap MlpModel.forward to clamp
-# distribution.scale to >= 1e-6 before any .sample() or .log_prob() call.
+# can drift negative during PPO updates.  We patch torch.distributions.Normal
+# directly so it works regardless of the rsl_rl class names.
 # ---------------------------------------------------------------------------
 import torch  # noqa: E402
-from rsl_rl.models.mlp_model import MlpModel  # noqa: E402
+import torch.distributions as _dist  # noqa: E402
 
-_original_mlp_forward = MlpModel.forward
-
-
-def _safe_forward(self, x, **kwargs):
-    result = _original_mlp_forward(self, x, **kwargs)
-    if hasattr(self, "distribution") and hasattr(self.distribution, "scale"):
-        self.distribution.scale = torch.clamp(self.distribution.scale, min=1e-6)
-    return result
+_OriginalNormal = _dist.Normal
 
 
-MlpModel.forward = _safe_forward
-print("[freenove_velocity] ✅ Patched MlpModel.forward – noise std clamped ≥ 1e-6")
+class _SafeNormal(_OriginalNormal):
+    def __init__(self, loc, scale, validate_args=None):
+        scale = torch.clamp(scale, min=1e-6)
+        super().__init__(loc, scale, validate_args=validate_args)
+
+
+_dist.Normal = _SafeNormal
+torch.distributions.Normal = _SafeNormal
+print("[freenove_velocity] ✅ Patched torch.distributions.Normal – std clamped ≥ 1e-6")
 # ---------------------------------------------------------------------------
 
 from mjlab.tasks.registry import register_mjlab_task
