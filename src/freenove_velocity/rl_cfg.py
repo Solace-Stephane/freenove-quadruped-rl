@@ -1,37 +1,29 @@
-"""RL configuration for Freenove Dog velocity task.
-
-Uses PPO via rsl_rl with noise_std_type="log" to guarantee
-the noise standard deviation stays positive (exp(param) > 0).
-"""
-
-from dataclasses import dataclass, field
+"""RL configuration for Freenove Dog velocity task."""
 
 from mjlab.rl import (
+    RslRlModelCfg,
     RslRlOnPolicyRunnerCfg,
-    RslRlPpoActorCriticCfg,
     RslRlPpoAlgorithmCfg,
 )
 
 
-@dataclass
-class FreenoveVelocityPPORunnerCfg(RslRlOnPolicyRunnerCfg):
-    """RL runner configuration for Freenove Dog velocity task."""
-
-    policy: RslRlPpoActorCriticCfg = field(
-        default_factory=lambda: RslRlPpoActorCriticCfg(
-            init_noise_std=1.0,
-            noise_std_type="log",  # exp(param) ensures std > 0 always
-            actor_hidden_dims=(256, 128, 64),
-            critic_hidden_dims=(256, 128, 64),
+def freenove_dog_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
+    return RslRlOnPolicyRunnerCfg(
+        actor=RslRlModelCfg(
+            hidden_dims=(256, 128, 64),
             activation="elu",
-        )
-    )
-    algorithm: RslRlPpoAlgorithmCfg = field(
-        default_factory=lambda: RslRlPpoAlgorithmCfg(
+        ),
+        critic=RslRlModelCfg(
+            hidden_dims=(256, 128, 64),
+            activation="elu",
+        ),
+        algorithm=RslRlPpoAlgorithmCfg(
             entropy_coef=0.02,
             learning_rate=0.0003,
             max_grad_norm=0.5,
-        )
+        ),
+        init_noise_std=1.0,
+        noise_std_type="log",
+        experiment_name="freenove_dog_velocity",
+        max_iterations=8_000,
     )
-    experiment_name: str = "freenove_dog_velocity"
-    max_iterations: int = 8_000
