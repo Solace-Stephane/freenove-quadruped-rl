@@ -29,13 +29,12 @@ _orig_log_prob = Normal.log_prob
 
 
 def _safe_rsample(self, sample_shape=torch.Size()):
-    # Clamp scale in-place on the tensor data (not the Parameter itself)
-    self.scale.data.clamp_(min=_MIN_STD)
+    self.scale = self.scale.clamp(min=_MIN_STD)
     return _orig_rsample(self, sample_shape)
 
 
 def _safe_log_prob(self, value):
-    self.scale.data.clamp_(min=_MIN_STD)
+    self.scale = self.scale.clamp(min=_MIN_STD)
     return _orig_log_prob(self, value)
 
 
