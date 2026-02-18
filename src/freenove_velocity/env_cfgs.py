@@ -57,16 +57,16 @@ def freenove_dog_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     num_slots=1,
     track_air_time=True,
   )
-  # Only detect base body contact with ground as "illegal".
-  # On this tiny 99mm robot, thigh/shank collision geoms naturally
-  # brush the ground during walking — that's expected, not illegal.
-  # Only the main body box touching ground means the robot has truly fallen.
+  # Detect ANY non-foot collision geom touching ground as "illegal".
+  # This prevents the policy from crawling on thighs/shanks instead of walking.
+  # Matches the ANYmal C reference: pattern=r".*_collision\d*$", exclude=feet.
   nonfoot_ground_cfg = ContactSensorCfg(
     name="nonfoot_ground_touch",
     primary=ContactMatch(
       mode="geom",
       entity="robot",
-      pattern=("base_collision",),
+      pattern=(r".*_collision",),
+      exclude=tuple(geom_names),
     ),
     secondary=ContactMatch(mode="body", pattern="terrain"),
     fields=("found",),
@@ -125,7 +125,7 @@ def freenove_dog_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   cfg.rewards["pose"].weight = cfg.rewards["pose"].weight * 0.3
 
   cfg.rewards["upright"].params["asset_cfg"].body_names = ("base",)
-  cfg.rewards["upright"].weight = 0.5  # reduced so it doesn't dominate over walking
+  cfg.rewards["upright"].weight = 1.0  # strong upright signal to prevent crawling
 
   # Boost velocity tracking rewards — the main learning signal.
   cfg.rewards["track_linear_velocity"].weight = (
