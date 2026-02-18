@@ -18,6 +18,7 @@ def freenove_dog_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
         actor=RslRlModelCfg(
             hidden_dims=(256, 128, 64),
             stochastic=True,
+            noise_std_type="log",  # exp(param) ensures std > 0 always
         ),
         critic=RslRlModelCfg(
             hidden_dims=(256, 128, 64),
