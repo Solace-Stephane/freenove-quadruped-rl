@@ -24,8 +24,15 @@ import torch  # noqa: E402
 from torch.distributions import Normal  # noqa: E402
 
 _MIN_STD = 1e-6
+_orig_sample = Normal.sample
 _orig_rsample = Normal.rsample
 _orig_log_prob = Normal.log_prob
+_orig_entropy = Normal.entropy
+
+
+def _safe_sample(self, sample_shape=torch.Size()):
+    self.scale = self.scale.clamp(min=_MIN_STD)
+    return _orig_sample(self, sample_shape)
 
 
 def _safe_rsample(self, sample_shape=torch.Size()):
@@ -38,9 +45,16 @@ def _safe_log_prob(self, value):
     return _orig_log_prob(self, value)
 
 
+def _safe_entropy(self):
+    self.scale = self.scale.clamp(min=_MIN_STD)
+    return _orig_entropy(self)
+
+
+Normal.sample = _safe_sample
 Normal.rsample = _safe_rsample
 Normal.log_prob = _safe_log_prob
-print("[freenove_velocity] ✅ Patched Normal.rsample/log_prob – scale clamped ≥ 1e-6")
+Normal.entropy = _safe_entropy
+print("[freenove_velocity] ✅ Patched Normal (sample/rsample/log_prob/entropy) – scale clamped ≥ 1e-6")
 # ---------------------------------------------------------------------------
 
 from mjlab.tasks.registry import register_mjlab_task
