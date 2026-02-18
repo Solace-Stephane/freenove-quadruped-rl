@@ -4,34 +4,44 @@ Registers two task variants:
   - Mjlab-Velocity-Flat-Freenove-Dog: flat terrain (primary)
   - Mjlab-Velocity-Rough-Freenove-Dog: rough terrain (future)
 
-Includes a monkey-patch for rsl_rl's MlpModel to prevent negative noise std
+Includes a monkey-patch to prevent negative noise std
 (RuntimeError: normal expects all elements of std >= 0.0).
 """
 
 # ---------------------------------------------------------------------------
-# Monkey-patch: clamp noise std so it never goes negative
-# The PyPI rsl_rl doesn't honour noise_std_type="log", so the raw std param
-# can drift negative during PPO updates.
+# Fix: prevent negative std in Normal distributions
 #
-# We patch torch.normal (the C++ function that actually raises
-# "normal expects all elements of std >= 0.0") to clamp std before calling
-# the original.  This is the simplest, zero-recursion-risk approach.
+# The PyPI rsl_rl ignores noise_std_type="log" and stores noise std as a raw
+# nn.Parameter (self.std).  During PPO gradient updates this can drift
+# negative, crashing torch.distributions.Normal.sample().
+#
+# Patching torch.normal at the Python level doesn't work — PyTorch calls it
+# at the C/CUDA level.  Instead we patch Normal.sample and Normal.rsample
+# to clamp scale immediately before the underlying C call.  These are thin
+# Python wrappers so we still control them.
 # ---------------------------------------------------------------------------
 import torch  # noqa: E402
+from torch.distributions import Normal  # noqa: E402
 
-_original_normal = torch.normal
-
-
-def _safe_normal(mean, std=1.0, *args, **kwargs):
-    if isinstance(std, torch.Tensor):
-        std = std.clamp(min=1e-6)
-    elif isinstance(std, (int, float)) and std < 1e-6:
-        std = 1e-6
-    return _original_normal(mean, std, *args, **kwargs)
+_MIN_STD = 1e-6
+_orig_rsample = Normal.rsample
+_orig_log_prob = Normal.log_prob
 
 
-torch.normal = _safe_normal
-print("[freenove_velocity] ✅ Patched torch.normal – std clamped ≥ 1e-6")
+def _safe_rsample(self, sample_shape=torch.Size()):
+    # Clamp scale in-place on the tensor data (not the Parameter itself)
+    self.scale.data.clamp_(min=_MIN_STD)
+    return _orig_rsample(self, sample_shape)
+
+
+def _safe_log_prob(self, value):
+    self.scale.data.clamp_(min=_MIN_STD)
+    return _orig_log_prob(self, value)
+
+
+Normal.rsample = _safe_rsample
+Normal.log_prob = _safe_log_prob
+print("[freenove_velocity] ✅ Patched Normal.rsample/log_prob – scale clamped ≥ 1e-6")
 # ---------------------------------------------------------------------------
 
 from mjlab.tasks.registry import register_mjlab_task
