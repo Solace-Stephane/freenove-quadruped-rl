@@ -12,7 +12,7 @@ from mjlab.rl import (
 
 
 def freenove_dog_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
-    return RslRlOnPolicyRunnerCfg(
+    cfg = RslRlOnPolicyRunnerCfg(
         actor=RslRlModelCfg(
             hidden_dims=(256, 128, 64),
             activation="elu",
@@ -33,3 +33,5 @@ def freenove_dog_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
         experiment_name="freenove_dog_velocity",
         max_iterations=8_000,
     )
+    print(f"[freenove_velocity] actor.noise_std_type={cfg.actor.noise_std_type}")
+    return cfg
