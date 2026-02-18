@@ -34,3 +34,6 @@ select = ["E4", "E7", "E9", "F", "I", "B"]
 
 [project.entry-points."mjlab.tasks"]
 freenove_velocity = "freenove_velocity"
+
+[project.scripts]
+train-patched = "freenove_velocity.train_patched:main"
