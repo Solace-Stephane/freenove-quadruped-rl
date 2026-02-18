@@ -24,7 +24,6 @@ deploy = [
 
 [tool.uv]
 prerelease = "allow"
-no-build-isolation-package = ["mjlab"]
 
 [tool.ruff]
 indent-width = 2
