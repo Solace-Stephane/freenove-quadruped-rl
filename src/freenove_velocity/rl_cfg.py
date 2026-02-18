@@ -23,8 +23,8 @@ def freenove_dog_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
             hidden_dims=(256, 128, 64),
         ),
         algorithm=RslRlPpoAlgorithmCfg(
-            entropy_coef=0.01,
+            entropy_coef=0.02,  # more exploration for this harder problem
         ),
         experiment_name="freenove_dog_velocity",
-        max_iterations=5_000,
+        max_iterations=8_000,
     )

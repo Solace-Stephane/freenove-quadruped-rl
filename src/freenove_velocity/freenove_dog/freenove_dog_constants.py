@@ -66,29 +66,30 @@ FREENOVE_DOG_ACTUATOR_CFG = BuiltinPositionActuatorCfg(
 # Keyframes / Initial state.
 ##
 
-# Standing pose: legs with moderate bend for stability.
+# Standing pose: legs with deeper bend for stability + ground clearance.
 # The robot stands at ~99mm height. With hip=23mm laterally and
 # femur+tibia=110mm vertically, we need enough knee bend to create
 # a stable stance that keeps the base well clear of the ground.
 #
-# With HFE=+/-0.3 and KFE=-/+0.5, effective standing height is ~95mm,
-# giving ~15mm clearance between base bottom and ground. This provides
-# more margin against immediate collapse from perturbations.
+# Deepened knee bend (0.6 rad vs 0.5) and raised spawn height (0.12m)
+# to prevent immediate ground contact with shank collision geoms.
+# This gives ~25mm clearance, enough to survive initial settling
+# and random perturbations without immediate episode termination.
 #
 # Front legs: positive HFE = forward swing, negative KFE = knee bend
 # Hind legs: negative HFE = rearward swing (mirrored), positive KFE
 INIT_STATE = EntityCfg.InitialStateCfg(
-  pos=(0.0, 0.0, 0.105),  # base at ~105mm (allows some settling)
+  pos=(0.0, 0.0, 0.12),  # base at 120mm (extra margin for settling)
   joint_pos={
     ".*HAA": 0.0,  # hips neutral (no abduction)
-    "LF_HFE": 0.3,  # front legs forward
-    "RF_HFE": 0.3,
-    "LH_HFE": -0.3,  # hind legs rearward
-    "RH_HFE": -0.3,
-    "LF_KFE": -0.5,  # front knees bent more
-    "RF_KFE": -0.5,
-    "LH_KFE": 0.5,  # hind knees bent more (mirrored axis)
-    "RH_KFE": 0.5,
+    "LF_HFE": 0.35,  # front legs slightly more forward
+    "RF_HFE": 0.35,
+    "LH_HFE": -0.35,  # hind legs slightly more rearward
+    "RH_HFE": -0.35,
+    "LF_KFE": -0.6,  # deeper knee bend for more ground clearance
+    "RF_KFE": -0.6,
+    "LH_KFE": 0.6,  # hind knees deeper bend (mirrored axis)
+    "RH_KFE": 0.6,
   },
   joint_vel={".*": 0.0},
 )

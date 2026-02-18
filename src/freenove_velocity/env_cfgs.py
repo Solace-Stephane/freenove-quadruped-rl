@@ -57,13 +57,16 @@ def freenove_dog_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     num_slots=1,
     track_air_time=True,
   )
+  # Only detect base body contact with ground as "illegal".
+  # On this tiny 99mm robot, thigh/shank collision geoms naturally
+  # brush the ground during walking — that's expected, not illegal.
+  # Only the main body box touching ground means the robot has truly fallen.
   nonfoot_ground_cfg = ContactSensorCfg(
     name="nonfoot_ground_touch",
     primary=ContactMatch(
       mode="geom",
       entity="robot",
-      pattern=r".*_collision\d*$",
-      exclude=tuple(geom_names),
+      pattern=("base_collision",),
     ),
     secondary=ContactMatch(mode="body", pattern="terrain"),
     fields=("found",),
@@ -82,8 +85,8 @@ def freenove_dog_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 
   # -- Viewer --
   cfg.viewer.body_name = "base"
-  cfg.viewer.distance = 0.8  # smaller robot, closer camera
-  cfg.viewer.elevation = -15.0
+  cfg.viewer.distance = 0.6  # smaller robot, closer camera
+  cfg.viewer.elevation = -20.0
 
   # -- Observations: foot height uses our site names --
   cfg.observations["critic"].terms["foot_height"].params[
@@ -103,23 +106,35 @@ def freenove_dog_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   # -- Rewards: tune for small hobby-servo robot --
   # Pose penalties: wider tolerance since servos are imprecise.
   cfg.rewards["pose"].params["std_standing"] = {
-    ".*HAA": 0.1,
-    ".*HFE": 0.1,
-    ".*KFE": 0.15,
+    ".*HAA": 0.15,
+    ".*HFE": 0.15,
+    ".*KFE": 0.2,
   }
   cfg.rewards["pose"].params["std_walking"] = {
-    ".*HAA": 0.4,
-    ".*HFE": 0.4,
-    ".*KFE": 0.6,
+    ".*HAA": 0.5,
+    ".*HFE": 0.5,
+    ".*KFE": 0.7,
   }
   cfg.rewards["pose"].params["std_running"] = {
-    ".*HAA": 0.4,
-    ".*HFE": 0.4,
-    ".*KFE": 0.6,
+    ".*HAA": 0.5,
+    ".*HFE": 0.5,
+    ".*KFE": 0.7,
   }
 
+  # Reduce pose weight so the policy doesn't just learn to stand still.
+  cfg.rewards["pose"].weight = cfg.rewards["pose"].weight * 0.5
+
   cfg.rewards["upright"].params["asset_cfg"].body_names = ("base",)
-  cfg.rewards["upright"].weight = 1.5  # extra upright reward (light robot)
+  cfg.rewards["upright"].weight = 1.0
+
+  # Boost velocity tracking rewards — the key learning signal.
+  # Without these being dominant, the policy converges to "stand still".
+  cfg.rewards["track_linear_velocity"].weight = (
+    cfg.rewards["track_linear_velocity"].weight * 2.0
+  )
+  cfg.rewards["track_angular_velocity"].weight = (
+    cfg.rewards["track_angular_velocity"].weight * 1.5
+  )
 
   cfg.rewards["body_ang_vel"].params["asset_cfg"].body_names = ("base",)
   cfg.rewards["body_ang_vel"].weight = 0.0
@@ -128,18 +143,21 @@ def freenove_dog_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     cfg.rewards[reward_name].params["asset_cfg"].site_names = site_names
 
   # Reduce foot clearance penalty (small robot, low swing is fine).
-  cfg.rewards["foot_clearance"].weight = -1.0
+  cfg.rewards["foot_clearance"].weight = -0.5
   cfg.rewards["foot_clearance"].params["target_height"] = (
-    0.03  # 30mm (vs 100mm default)
+    0.02  # 20mm (vs 100mm default)
   )
-  cfg.rewards["foot_swing_height"].weight = -0.1
-  cfg.rewards["foot_swing_height"].params["target_height"] = 0.03  # 30mm
+  cfg.rewards["foot_swing_height"].weight = -0.05
+  cfg.rewards["foot_swing_height"].params["target_height"] = 0.02  # 20mm
 
   cfg.rewards["angular_momentum"].weight = 0.0
-  cfg.rewards["air_time"].weight = 0.0
 
-  # Slightly penalize large actions to keep motions smooth for real servos.
-  cfg.rewards["action_rate_l2"].weight = -0.15
+  # Enable air time reward to encourage proper gait cycles.
+  cfg.rewards["air_time"].weight = 0.5
+
+  # Light action rate penalty — enough for smooth motions but not so much
+  # that it discourages the policy from moving at all.
+  cfg.rewards["action_rate_l2"].weight = -0.08
 
   # -- Terminations --
   cfg.terminations["illegal_contact"] = TerminationTermCfg(
