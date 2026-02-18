@@ -1,7 +1,12 @@
 """RL configuration for Freenove Dog velocity task.
 
-Uses noise_std_type="log" on the actor so that noise std is parameterised
-as exp(param), guaranteeing it stays positive throughout training.
+Matches the ANYmal C reference implementation:
+  https://github.com/mujocolab/anymal_c_velocity
+
+Note: noise_std_type="log" was removed because the PyPI version of rsl_rl
+(bundled with mjlab) doesn't support it — it only exists in the GitHub dev
+version. Using the default "scalar" mode instead, with a safety clamp in
+__init__.py to prevent std from going negative during PPO updates.
 """
 
 from mjlab.rl import (
@@ -12,18 +17,15 @@ from mjlab.rl import (
 
 
 def freenove_dog_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
-    cfg = RslRlOnPolicyRunnerCfg(
+    return RslRlOnPolicyRunnerCfg(
         actor=RslRlModelCfg(
             hidden_dims=(256, 128, 64),
             activation="elu",
             stochastic=True,
-            init_noise_std=1.0,
-            noise_std_type="log",  # exp(param) → always positive
         ),
         critic=RslRlModelCfg(
             hidden_dims=(256, 128, 64),
             activation="elu",
-            stochastic=False,
         ),
         algorithm=RslRlPpoAlgorithmCfg(
             entropy_coef=0.02,
@@ -33,5 +35,4 @@ def freenove_dog_ppo_runner_cfg() -> RslRlOnPolicyRunnerCfg:
         experiment_name="freenove_dog_velocity",
         max_iterations=8_000,
     )
-    print(f"[freenove_velocity] actor.noise_std_type={cfg.actor.noise_std_type}")
-    return cfg
+
