@@ -57,16 +57,16 @@ def freenove_dog_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     num_slots=1,
     track_air_time=True,
   )
-  # Detect ANY non-foot collision geom touching ground as "illegal".
-  # This prevents the policy from crawling on thighs/shanks instead of walking.
-  # Matches the ANYmal C reference: pattern=r".*_collision\d*$", exclude=feet.
+  # Only terminate on BASE body touching ground (= truly fallen).
+  # On this tiny 99mm robot, thigh/shank geoms naturally brush the ground
+  # during walking — that's expected. Crawling is prevented by a strong
+  # upright reward instead (policy gets ~0 upright reward when crawling).
   nonfoot_ground_cfg = ContactSensorCfg(
     name="nonfoot_ground_touch",
     primary=ContactMatch(
       mode="geom",
       entity="robot",
-      pattern=(r".*_collision",),
-      exclude=tuple(geom_names),
+      pattern=("base_collision",),
     ),
     secondary=ContactMatch(mode="body", pattern="terrain"),
     fields=("found",),
@@ -125,7 +125,11 @@ def freenove_dog_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   cfg.rewards["pose"].weight = cfg.rewards["pose"].weight * 0.3
 
   cfg.rewards["upright"].params["asset_cfg"].body_names = ("base",)
-  cfg.rewards["upright"].weight = 1.0  # strong upright signal to prevent crawling
+  # Strong upright reward: the primary anti-crawling mechanism.
+  # When crawling, upright ≈ 0.005 (near-zero reward).
+  # When standing, upright ≈ 0.98 (near-maximum reward).
+  # At weight 2.0, crawling loses ~2.0 reward/step vs walking.
+  cfg.rewards["upright"].weight = 2.0
 
   # Boost velocity tracking rewards — the main learning signal.
   cfg.rewards["track_linear_velocity"].weight = (
