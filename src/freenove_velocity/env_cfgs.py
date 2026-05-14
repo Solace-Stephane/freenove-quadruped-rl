@@ -32,73 +32,99 @@ from freenove_velocity.freenove_dog.freenove_dog_constants import (
 )
 
 
-# Rough terrain config scaled for the 99mm-tall Freenove robot.
-# Heights are scaled smaller than the default ROUGH_TERRAINS_CFG (which targets
-# ANYmal/Go1 ~50cm robots), but kept LARGE ENOUGH to look like real terrain
-# rather than a sea of tiny pebbles when viewed from the training-video camera.
+# Rough terrain config tuned for visual realism on the 99mm Freenove robot.
+#
+# Design notes:
+#   - Heightfield (Hf*) terrains get auto-generated elevation-shaded textures
+#     in mjlab (greens at low, browns/whites at high), so they look like real
+#     natural ground. We lean heavily on them.
+#   - Perlin noise gives the most natural "rolling outdoor terrain" look.
+#   - Box-based terrains (stairs, etc.) are kept for crisp step features.
+#   - Heights kept step-able for the small robot (≤5cm).
 FREENOVE_ROUGH_TERRAINS_CFG = TerrainGeneratorCfg(
   size=(3.0, 3.0),
   border_width=3.0,
   num_rows=10,
   num_cols=20,
   sub_terrains={
-    # Clear flat patches for the curriculum to start easy.
-    "flat": terrain_gen.BoxFlatTerrainCfg(proportion=0.15),
-
-    # Pyramid stairs — visually obvious step features (4cm max ~= 40% body height).
-    "pyramid_stairs": terrain_gen.BoxPyramidStairsTerrainCfg(
+    # Easy curriculum start: gentle Perlin noise (looks natural; not flat boxes).
+    "perlin_gentle": terrain_gen.HfPerlinNoiseTerrainCfg(
       proportion=0.15,
-      step_height_range=(0.01, 0.04),
+      height_range=(0.005, 0.03),
+      octaves=4,
+      persistence=0.5,
+      lacunarity=2.0,
+      scale=8.0,
+      horizontal_scale=0.04,
+      resolution=0.02,
+      border_width=0.2,
+    ),
+
+    # Harder Perlin — rolling hills, the headline "outdoor" look.
+    "perlin_hills": terrain_gen.HfPerlinNoiseTerrainCfg(
+      proportion=0.2,
+      height_range=(0.02, 0.06),
+      octaves=5,
+      persistence=0.55,
+      lacunarity=2.2,
+      scale=6.0,
+      horizontal_scale=0.05,
+      resolution=0.02,
+      border_width=0.2,
+    ),
+
+    # Stairs — crisp step features for vision/proprioception challenge.
+    "pyramid_stairs": terrain_gen.BoxPyramidStairsTerrainCfg(
+      proportion=0.1,
+      step_height_range=(0.01, 0.035),
       step_width=0.18,
       platform_width=0.8,
       border_width=0.4,
     ),
     "pyramid_stairs_inv": terrain_gen.BoxInvertedPyramidStairsTerrainCfg(
-      proportion=0.15,
-      step_height_range=(0.01, 0.04),
+      proportion=0.1,
+      step_height_range=(0.01, 0.035),
       step_width=0.18,
       platform_width=0.8,
       border_width=0.4,
     ),
 
-    # Slopes — sloped pyramids, up to 25°.
+    # Sloped heightfield pyramids — textured slopes, looks like a small hill.
     "hf_pyramid_slope": terrain_gen.HfPyramidSlopedTerrainCfg(
-      proportion=0.1,
-      slope_range=(0.1, 0.45),
+      proportion=0.075,
+      slope_range=(0.1, 0.4),
       platform_width=0.6,
       border_width=0.25,
     ),
     "hf_pyramid_slope_inv": terrain_gen.HfPyramidSlopedTerrainCfg(
-      proportion=0.1,
-      slope_range=(0.1, 0.45),
+      proportion=0.075,
+      slope_range=(0.1, 0.4),
       platform_width=0.6,
       border_width=0.25,
       inverted=True,
     ),
 
-    # Discrete boxes scattered on the ground — looks like cobblestone/rubble.
-    # Heights are step-able (≤3cm) so the policy can learn to navigate over them.
+    # Discrete obstacles — looks like rocks/rubble strewn on the ground.
     "discrete_obstacles": terrain_gen.HfDiscreteObstaclesTerrainCfg(
-      proportion=0.15,
-      obstacle_height_range=(0.01, 0.03),
-      obstacle_width_range=(0.06, 0.2),
-      num_obstacles=25,
+      proportion=0.1,
+      obstacle_height_range=(0.015, 0.04),
+      obstacle_width_range=(0.08, 0.25),
+      num_obstacles=20,
       border_width=0.25,
     ),
 
-    # Random terrain — wider noise range and larger step so bumps look like
-    # actual rocky ground rather than tiny pebbles.
+    # Random uniform — rocky/gravelly ground, varied bump sizes.
     "random_rough": terrain_gen.HfRandomUniformTerrainCfg(
       proportion=0.1,
-      noise_range=(0.005, 0.04),
+      noise_range=(0.01, 0.04),
       noise_step=0.01,
       border_width=0.25,
     ),
 
-    # Waves — broader, taller waves for visual interest and a real challenge.
+    # Waves — visually obvious large undulations.
     "wave_terrain": terrain_gen.HfWaveTerrainCfg(
       proportion=0.1,
-      amplitude_range=(0.01, 0.05),
+      amplitude_range=(0.015, 0.05),
       num_waves=3,
       border_width=0.25,
     ),
