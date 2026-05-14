@@ -33,52 +33,73 @@ from freenove_velocity.freenove_dog.freenove_dog_constants import (
 
 
 # Rough terrain config scaled for the 99mm-tall Freenove robot.
-# Feature heights are ~5x smaller than the default ROUGH_TERRAINS_CFG, which
-# targets ANYmal/Go1-sized robots (~50cm tall).
+# Heights are scaled smaller than the default ROUGH_TERRAINS_CFG (which targets
+# ANYmal/Go1 ~50cm robots), but kept LARGE ENOUGH to look like real terrain
+# rather than a sea of tiny pebbles when viewed from the training-video camera.
 FREENOVE_ROUGH_TERRAINS_CFG = TerrainGeneratorCfg(
-  size=(4.0, 4.0),
-  border_width=4.0,
+  size=(3.0, 3.0),
+  border_width=3.0,
   num_rows=10,
   num_cols=20,
   sub_terrains={
-    "flat": terrain_gen.BoxFlatTerrainCfg(proportion=0.3),
+    # Clear flat patches for the curriculum to start easy.
+    "flat": terrain_gen.BoxFlatTerrainCfg(proportion=0.15),
+
+    # Pyramid stairs — visually obvious step features (4cm max ~= 40% body height).
     "pyramid_stairs": terrain_gen.BoxPyramidStairsTerrainCfg(
       proportion=0.15,
-      step_height_range=(0.0, 0.02),  # max 2cm steps
-      step_width=0.12,
-      platform_width=1.0,
-      border_width=0.5,
+      step_height_range=(0.01, 0.04),
+      step_width=0.18,
+      platform_width=0.8,
+      border_width=0.4,
     ),
     "pyramid_stairs_inv": terrain_gen.BoxInvertedPyramidStairsTerrainCfg(
       proportion=0.15,
-      step_height_range=(0.0, 0.02),
-      step_width=0.12,
-      platform_width=1.0,
-      border_width=0.5,
+      step_height_range=(0.01, 0.04),
+      step_width=0.18,
+      platform_width=0.8,
+      border_width=0.4,
     ),
+
+    # Slopes — sloped pyramids, up to 25°.
     "hf_pyramid_slope": terrain_gen.HfPyramidSlopedTerrainCfg(
       proportion=0.1,
-      slope_range=(0.0, 0.35),  # ~20°
-      platform_width=1.0,
+      slope_range=(0.1, 0.45),
+      platform_width=0.6,
       border_width=0.25,
     ),
     "hf_pyramid_slope_inv": terrain_gen.HfPyramidSlopedTerrainCfg(
       proportion=0.1,
-      slope_range=(0.0, 0.35),
-      platform_width=1.0,
+      slope_range=(0.1, 0.45),
+      platform_width=0.6,
       border_width=0.25,
       inverted=True,
     ),
-    "random_rough": terrain_gen.HfRandomUniformTerrainCfg(
-      proportion=0.1,
-      noise_range=(0.005, 0.025),  # 5-25mm bumps
-      noise_step=0.005,
+
+    # Discrete boxes scattered on the ground — looks like cobblestone/rubble.
+    # Heights are step-able (≤3cm) so the policy can learn to navigate over them.
+    "discrete_obstacles": terrain_gen.HfDiscreteObstaclesTerrainCfg(
+      proportion=0.15,
+      obstacle_height_range=(0.01, 0.03),
+      obstacle_width_range=(0.06, 0.2),
+      num_obstacles=25,
       border_width=0.25,
     ),
+
+    # Random terrain — wider noise range and larger step so bumps look like
+    # actual rocky ground rather than tiny pebbles.
+    "random_rough": terrain_gen.HfRandomUniformTerrainCfg(
+      proportion=0.1,
+      noise_range=(0.005, 0.04),
+      noise_step=0.01,
+      border_width=0.25,
+    ),
+
+    # Waves — broader, taller waves for visual interest and a real challenge.
     "wave_terrain": terrain_gen.HfWaveTerrainCfg(
       proportion=0.1,
-      amplitude_range=(0.0, 0.03),  # max 3cm wave amplitude
-      num_waves=4,
+      amplitude_range=(0.01, 0.05),
+      num_waves=3,
       border_width=0.25,
     ),
   },
